@@ -9,12 +9,13 @@ public class UDPReceiver : MonoBehaviour
 {
     Thread receiveThread;
     UdpClient client;
-    public int port = 5005; // Πρέπει να είναι το ίδιο με την Python!
+    public int port = 5005;
 
-    // Εδώ αποθηκεύουμε την τελευταία θέση που λάβαμε
+    // Μεταβλητές για τις θέσεις X και Y
     private float targetX = 0f;
+    private float targetY = 0f;
 
-    // Ασφάλεια για threading (Unity API runs on main thread only)
+    // Ασφάλεια για threading
     private object lockObject = new object();
 
     void Start()
@@ -32,21 +33,27 @@ public class UDPReceiver : MonoBehaviour
         {
             try
             {
+                // --- Η ΓΡΑΜΜΗ ΠΟΥ ΕΛΕΙΠΕ ---
                 IPEndPoint anyIP = new IPEndPoint(IPAddress.Any, 0);
-                byte[] data = client.Receive(ref anyIP);
+                byte[] data = client.Receive(ref anyIP); // Εδώ ορίζεται το 'data'
+                // ---------------------------
+
                 string text = Encoding.UTF8.GetString(data);
 
-                // Το μήνυμα είναι "X,Y,Z". Το κόβουμε στα κόμματα.
+                // Το Python στέλνει "X,Y,Z" -> Κόβουμε στα κόμματα
                 string[] coords = text.Split(',');
 
-                if (coords.Length >= 1)
+                // Ελέγχουμε αν λάβαμε τουλάχιστον 2 τιμές (X και Y)
+                if (coords.Length >= 2)
                 {
-                    // Διαβάζουμε το X (χρησιμοποιούμε InvariantCulture για την τελεία στα decimals)
+                    // Parse με InvariantCulture για να καταλαβαίνει την τελεία (.) ως υποδιαστολή
                     float x = float.Parse(coords[0], CultureInfo.InvariantCulture);
+                    float y = float.Parse(coords[1], CultureInfo.InvariantCulture);
 
                     lock (lockObject)
                     {
-                        targetX = x; // Αποθήκευση για το Update()
+                        targetX = x;
+                        targetY = y;
                     }
                 }
             }
@@ -59,22 +66,22 @@ public class UDPReceiver : MonoBehaviour
 
     void Update()
     {
-        // Εδώ κουνάμε τον κύβο. Το Unity τρέχει το Update κάθε frame.
-        float currentX;
+        float curX, curY;
 
         lock (lockObject)
         {
-            currentX = targetX;
+            curX = targetX;
+            curY = targetY;
         }
 
-        // Κουνάμε τον κύβο στον άξονα Χ (αριστερά-δεξιά)
-        // Το divide by 2 είναι για να χωράει στην οθόνη
-        transform.position = new Vector3(currentX / 2.0f, 0, 0);
+        // Κίνηση σε X και Y.
+        // Διαιρούμε με 2.0f για να χωράει η κίνηση στην οθόνη του Unity
+        transform.position = new Vector3(curX / 2.0f, curY / 2.0f, 0);
     }
 
     void OnApplicationQuit()
     {
         if (receiveThread != null) receiveThread.Abort();
-        client.Close();
+        if (client != null) client.Close();
     }
 }
