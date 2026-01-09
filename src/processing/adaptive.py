@@ -10,13 +10,19 @@ class AdaptiveMapper:
 
     def map_input(self, filtered_val):
         abs_val = abs(filtered_val)
+        status = "" # Μεταβλητή για να ξέρουμε σε τι mode είμαστε
 
         # Λογική Adaptive Gain
         if abs_val < self.threshold:
             # Precision Mode (μικρές κινήσεις -> πολύ χαμηλή ευαισθησία)
             current_gain = self.base_gain * self.precision_factor
+            status = "Precision Mode"
         else:
             # Fast Mode (γρήγορες κινήσεις -> κανονική ευαισθησία)
             current_gain = self.base_gain
+            status = "Fast Mode"
 
-        return filtered_val * current_gain
+        final_result = filtered_val * current_gain
+
+        # ΕΠΙΣΤΡΕΦΟΥΜΕ 2 ΤΙΜΕΣ (Την τιμή ΚΑΙ το Status)
+        return final_result, status

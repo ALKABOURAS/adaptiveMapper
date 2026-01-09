@@ -1,6 +1,8 @@
 import sys
 import os
 import time
+import csv
+from datetime import datetime
 
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 
@@ -16,27 +18,43 @@ def run_live_simulation():
     mapper = AdaptiveMapper(threshold=2.5, precision_factor=0.1)
     sender = UDPSender(port=5005)
 
-    print("🚀 Sending Data to Unity... Press Ctrl+C to stop.")
+    # --- SETUP CSV LOGGING ---
+    results_dir = os.path.join(os.path.dirname(__file__), '..', 'simulation_results')
+    if not os.path.exists(results_dir):
+        os.makedirs(results_dir)
 
-    try:
-        while True:
-            # 1. Read
-            _, noisy_val = sensor.read_gyro_z()
+    timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    csv_filename = os.path.join(results_dir, f"{timestamp}_live_data.csv")
 
-            # 2. Filter
-            clean_val = kf.update(noisy_val)
+    print(f"🚀 Sending Data to Unity... Logging to: {csv_filename}")
+    print("Press Ctrl+C to stop.")
 
-            # 3. Adapt
-            final_val, mode = mapper.map_input(clean_val)
+    # Ανοίγουμε το αρχείο για γράψιμο
+    with open(csv_filename, mode='w', newline='') as file:
+        writer = csv.writer(file)
+        # Γράφουμε τους τίτλους των στηλών
+        writer.writerow(["Timestamp", "Raw_Noise", "Filtered", "Final_Adaptive", "Mode"])
 
-            # 4. Send to Unity (Στέλνουμε το final_val ως X)
-            sender.send_data(final_val, 0, 0)
+        try:
+            start_time = time.time()
+            while True:
+                # 1. Processing Loop
+                _, noisy_val = sensor.read_gyro_z()
+                clean_val = kf.update(noisy_val)
+                final_val, mode = mapper.map_input(clean_val)
 
-            # Μικρή καθυστέρηση για να προλαβαίνουμε να το δούμε (simulate 60fps)
-            time.sleep(0.016)
+                # 2. Send to Unity
+                sender.send_data(final_val, 0, 0)
 
-    except KeyboardInterrupt:
-        print("\n🛑 Stopped.")
+                # 3. Log to CSV
+                current_time = time.time() - start_time
+                writer.writerow([f"{current_time:.4f}", f"{noisy_val:.4f}", f"{clean_val:.4f}", f"{final_val:.4f}", mode])
+
+                time.sleep(0.016) # ~60 FPS
+
+        except KeyboardInterrupt:
+            print("\n🛑 Stopped.")
+            print(f"✅ Data saved to {csv_filename}")
 
 if __name__ == "__main__":
     run_live_simulation()
