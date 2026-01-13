@@ -1,171 +1,155 @@
 import hid
 import time
+from collections import deque # ΝΕΟ: Για να κρατάμε ιστορικό
 
 class JoyConDriver:
-    def __init__(self):
+    def __init__(self, is_left=False):
         self.VENDOR_ID = 0x057E
-        self.PRODUCT_L = 0x2006
-        self.PRODUCT_R = 0x2007
+        self.TARGET_PRODUCT_ID = 0x2006 if is_left else 0x2007
+        self.is_left = is_left
         self.device = None
         self.global_packet_number = 0
+
+        # --- CALIBRATION VARS ---
         self.bias_x = 0
         self.bias_y = 0
         self.bias_z = 0
+        self.DPS_FACTOR = 0.06103
+
+        # --- AUTO-CALIBRATION VARS (NEW) ---
+        # Κρατάμε τις τελευταίες 50 μετρήσεις (περίπου 0.7 δευτερόλεπτα ιστορικού)
+        self.history_len = 50
+        self.gyro_history_x = deque(maxlen=self.history_len)
+        self.gyro_history_y = deque(maxlen=self.history_len)
+        self.gyro_history_z = deque(maxlen=self.history_len)
+
+        self.still_start_time = None # Πότε ξεκίνησε να είναι ακίνητο
+        self.required_still_time = 2.0 # Πόσα δευτερόλεπτα ακινησίας απαιτούνται
 
     def open(self):
-        print("🔍 Scanning for Joy-Cons...")
+        print(f"🔍 Scanning for {'LEFT' if self.is_left else 'RIGHT'} Joy-Con...")
         for device_info in hid.enumerate(self.VENDOR_ID):
-            pid = device_info['product_id']
-            if pid == self.PRODUCT_L or pid == self.PRODUCT_R:
-                print(f"✅ Found Joy-Con ({'Left' if pid == self.PRODUCT_L else 'Right'})")
+            if device_info['product_id'] == self.TARGET_PRODUCT_ID:
+                print(f"✅ Found Joy-Con ({'Left' if self.is_left else 'Right'})")
                 try:
                     self.device = hid.device()
                     self.device.open_path(device_info['path'])
                     self.device.set_nonblocking(True)
-
-                    # Καθαρίζουμε τυχόν σκουπίδια από το buffer
-                    self._flush_input()
-
-                    # --- SEQUENCE ΕΝΕΡΓΟΠΟΙΗΣΗΣ ---
                     self._enable_imu_sequence()
                     return True
                 except Exception as e:
                     print(f"❌ Failed to open: {e}")
-                    return False
         return False
 
-    def _flush_input(self):
-        """Αδειάζει το buffer πριν στείλουμε εντολές."""
-        for _ in range(10):
-            self.device.read(64)
-
     def _send_command(self, subcommand, argument):
-        """
-        Στέλνει εντολή με σωστό 'Neutral Rumble' για να μην την αγνοεί το Joy-Con.
-        Format: [0x01] [Timer] [Rumble(8 bytes)] [Subcmd] [Arg]
-        """
         self.global_packet_number = (self.global_packet_number + 1) % 16
-
-        # Neutral Rumble bytes: x00 x01 x40 x40 (για High/Low bands) x2
-        # Αυτό λέει στο Joy-Con "Μην δονείσαι, αλλά άκου την εντολή"
         rumble_data = [0x00, 0x01, 0x40, 0x40, 0x00, 0x01, 0x40, 0x40]
-
-        command = [0x01, self.global_packet_number] \
-                  + rumble_data \
-                  + [subcommand] \
-                  + argument
-
+        command = [0x01, self.global_packet_number] + rumble_data + [subcommand] + argument
         self.device.write(bytes(command))
-        time.sleep(0.05) # Μικρή καθυστέρηση για να προλάβει να επεξεργαστεί
+        time.sleep(0.05)
 
     def _enable_imu_sequence(self):
-        print("⚙️  Waking up Sensors...")
-
-        # 1. Enable IMU (6-Axis Sensor)
-        # Subcmd: 0x40, Arg: 0x01 (Enable)
         self._send_command(0x40, [0x01])
-
-        # 2. Set Input Report Mode to Standard Full (0x30)
-        # Subcmd: 0x03, Arg: 0x30
         self._send_command(0x03, [0x30])
+        time.sleep(0.2)
 
-        print("🚀 Commands Sent. Waiting for response...")
-        time.sleep(0.5) # Περιμένουμε λίγο να ξυπνήσει
-
-    def read_gyro(self):
-        if not self.device: return None
-
-        # Διαβάζουμε μέχρι 64 bytes (το report 0x30 είναι συνήθως 49 bytes)
-        report = self.device.read(64)
-
-        if not report: return None
-
-        # DEBUG: Ας δούμε τι Report στέλνει
-        # Αν στέλνει 0x3F (63), είναι ακόμα σε απλό mode (buttons only)
-        # Αν στέλνει 0x30 (48), είναι στο σωστό mode
-        report_id = report[0]
-
-        if report_id == 0x30:
-            # RAW Data Parsing (Little Endian)
-            # Bytes 19-24 είναι το 1ο Gyro Sample
-            raw_gyro_x = report[19] | (report[20] << 8)
-            raw_gyro_y = report[21] | (report[22] << 8)
-            raw_gyro_z = report[23] | (report[24] << 8)
-
-            def to_signed(n):
-                return n - 65536 if n > 32767 else n
-
-            # Joy-Con Hardware Scaling (χονδρικό calibration για να βγάλει dps)
-            # Το coefficient είναι περίπου 0.00061 για degrees/ms ή κάτι παρόμοιο.
-            # Εμείς θέλουμε απλά raw values τώρα.
-            gx = to_signed(raw_gyro_x)
-            gy = to_signed(raw_gyro_y)
-            gz = to_signed(raw_gyro_z)
-            # --- NEW: Subtract Calibration Bias ---
-            final_gx = gx - self.bias_x
-            final_gy = gy - self.bias_y
-            final_gz = gz - self.bias_z
-
-            # Επιστρέφουμε και το Report ID για debug
-            return report_id, gx, gy, gz
-
-        elif report_id == 0x3F:
-            # Είναι ακόμα σε Button Mode
-            return report_id, 0, 0, 0
-
-        return report_id, 0, 0, 0
-
+    # --- Η ΚΛΑΣΙΚΗ CALIBRATE (ΧΕΙΡΟΚΙΝΗΤΗ) ---
     def calibrate(self, samples=500):
-        """
-        Διαβάζει 500 τιμές ενώ το χειριστήριο είναι ακίνητο
-        και υπολογίζει το μέσο σφάλμα (Bias).
-        """
-        print(f"⚖️  Calibrating... DO NOT MOVE the Joy-Con! ({samples} samples)")
-
-        sum_x, sum_y, sum_z = 0, 0, 0
+        print(f"⚖️  Manual Calibration... STAY STILL!")
+        sx, sy, sz = 0, 0, 0
         count = 0
-
         while count < samples:
-            data = self.read_gyro()
+            data = self._read_raw_dps() # Διαβάζουμε χωρίς αφαίρεση bias
             if data:
-                rid, gx, gy, gz = data
-                if rid == 0x30:
-                    sum_x += gx
-                    sum_y += gy
-                    sum_z += gz
-                    count += 1
-            # Μικρή καθυστέρηση για να μην βομβαρδίζουμε
+                gx, gy, gz = data
+                sx += gx; sy += gy; sz += gz
+                count += 1
             time.sleep(0.002)
 
-        self.bias_x = sum_x / count
-        self.bias_y = sum_y / count
-        self.bias_z = sum_z / count
+        self.bias_x = sx / count
+        self.bias_y = sy / count
+        self.bias_z = sz / count
+        print(f"✅ Manual Bias Set: {self.bias_x:.2f}, {self.bias_y:.2f}, {self.bias_z:.2f}")
 
-        print(f"✅ Calibration Done! Bias -> X:{self.bias_x:.1f}, Y:{self.bias_y:.1f}, Z:{self.bias_z:.1f}")
-        return self.bias_x, self.bias_y, self.bias_z
+    # --- Η ΝΕΑ AUTO-CALIBRATE LOGIC ---
+    def check_auto_calibration(self, raw_dps_x, raw_dps_y, raw_dps_z):
+        """
+        Καλείται σε κάθε frame. Ελέγχει αν είμαστε ακίνητοι και διορθώνει το Bias.
+        Επιστρέφει True αν έγινε recalibration.
+        """
+        self.gyro_history_x.append(raw_dps_x)
+        self.gyro_history_y.append(raw_dps_y)
+        self.gyro_history_z.append(raw_dps_z)
+
+        # Πρέπει να γεμίσει το buffer πρώτα
+        if len(self.gyro_history_x) < self.history_len:
+            return False
+
+        # Υπολογισμός 'Θορύβου' (Max - Min)
+        noise_x = max(self.gyro_history_x) - min(self.gyro_history_x)
+        noise_y = max(self.gyro_history_y) - min(self.gyro_history_y)
+        noise_z = max(self.gyro_history_z) - min(self.gyro_history_z)
+
+        # Όριο θορύβου (Threshold): Αν κουνιέται λιγότερο από 3.0 dps, θεωρείται ακίνητο.
+        STABILITY_THRESHOLD = 3.0
+
+        is_stable = (noise_x < STABILITY_THRESHOLD) and \
+                    (noise_y < STABILITY_THRESHOLD) and \
+                    (noise_z < STABILITY_THRESHOLD)
+
+        if is_stable:
+            if self.still_start_time is None:
+                self.still_start_time = time.time()
+            else:
+                # Αν είμαστε σταθεροί για τον απαιτούμενο χρόνο
+                if time.time() - self.still_start_time > self.required_still_time:
+                    # UPDATING BIAS!
+                    self.bias_x = sum(self.gyro_history_x) / self.history_len
+                    self.bias_y = sum(self.gyro_history_y) / self.history_len
+                    self.bias_z = sum(self.gyro_history_z) / self.history_len
+
+                    self.still_start_time = None # Reset timer
+                    self.gyro_history_x.clear() # Clear buffers
+                    return True # Ενημερώνουμε ότι έγινε recalibration
+        else:
+            self.still_start_time = None # Κουνήθηκε, άρα reset το χρονόμετρο
+
+        return False
+
+    def _read_raw_dps(self):
+        """Helper function: Διαβάζει DPS χωρίς να αφαιρεί το bias."""
+        if not self.device: return None
+        report = self.device.read(64)
+        if not report or report[0] != 0x30: return None
+
+        raw_gx = report[19] | (report[20] << 8)
+        raw_gy = report[21] | (report[22] << 8)
+        raw_gz = report[23] | (report[24] << 8)
+        def to_signed(n): return n - 65536 if n > 32767 else n
+
+        return (to_signed(raw_gx)*self.DPS_FACTOR,
+                to_signed(raw_gy)*self.DPS_FACTOR,
+                to_signed(raw_gz)*self.DPS_FACTOR)
+
+    def read_imu_dps(self):
+        """Η κύρια συνάρτηση που καλείς. Κάνει ΚΑΙ τον έλεγχο auto-calib."""
+        raw_data = self._read_raw_dps()
+        if not raw_data: return None
+
+        raw_x, raw_y, raw_z = raw_data
+
+        # 1. Τρέξε τον έλεγχο (παρασκηνιακά)
+        was_calibrated = self.check_auto_calibration(raw_x, raw_y, raw_z)
+
+        # 2. Επίστρεψε το διορθωμένο
+        final_x = raw_x - self.bias_x
+        final_y = raw_y - self.bias_y
+        final_z = raw_z - self.bias_z
+
+        if was_calibrated:
+            print(f"✨ Auto-Calibrated! New Bias -> X:{self.bias_x:.1f}, Y:{self.bias_y:.1f}")
+
+        return final_x, final_y, final_z
 
     def close(self):
         if self.device: self.device.close()
-
-if __name__ == "__main__":
-    joy = JoyConDriver()
-    if joy.open():
-        try:
-            print("📡 Monitoring Sensor Data... (Ctrl+C to stop)")
-            while True:
-                data = joy.read_gyro()
-                if data:
-                    rid, gx, gy, gz = data
-
-                    if rid == 0x30:
-                        # Τυπώνουμε μόνο αν οι τιμές ΔΕΝ είναι μηδέν (ή για debug)
-                        print(f"✅ [0x30] Gyro -> X: {gx:5d} | Y: {gy:5d} | Z: {gz:5d}")
-                    elif rid == 0x3F:
-                        print(f"⚠️ [0x3F] Joy-Con is stuck in Button Mode. Retrying init...")
-                        joy._enable_imu_sequence() # Ξαναδοκιμάζουμε να το ξυπνήσουμε
-                    else:
-                        print(f"❓ Unknown Report ID: {hex(rid)}")
-
-        except KeyboardInterrupt:
-            print("\nStopping...")
-            joy.close()

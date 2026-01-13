@@ -20,9 +20,9 @@ def run_application():
 
     # --- CONFIGURATION ---
     # Πειράζουμε αυτά τα νούμερα για να φτιάξουμε την αίσθηση
-    SENSITIVITY_X = 80.0  # Μεγαλύτερο νούμερο = Πιο αργή κίνηση
-    SENSITIVITY_Y = 80.0
-    DEADZONE = 10.0       # Αν η τιμή (μετά το bias) είναι < 10, γίνε 0.
+    SENSITIVITY_X = 200  # Μεγαλύτερο νούμερο = Πιο αργή κίνηση
+    SENSITIVITY_Y = 200
+    DEADZONE = 50       # Αν η τιμή (μετά το bias) είναι < 10, γίνε 0.
 
     kf_x = SimpleKalmanFilter(process_noise=0.5, measurement_noise=10.0)
     kf_y = SimpleKalmanFilter(process_noise=0.5, measurement_noise=10.0)
