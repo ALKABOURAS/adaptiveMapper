@@ -3,34 +3,49 @@ import time
 from collections import deque # ΝΕΟ: Για να κρατάμε ιστορικό
 
 class JoyConDriver:
-    def __init__(self, is_left=False):
+    def __init__(self, device_type='right'):
+        """
+        device_type: 'left', 'right', ή 'pro'
+        """
         self.VENDOR_ID = 0x057E
-        self.TARGET_PRODUCT_ID = 0x2006 if is_left else 0x2007
-        self.is_left = is_left
+
+        # Mapping ονομάτων σε Product IDs
+        self.PRODUCT_IDS = {
+            'left': 0x2006,
+            'right': 0x2007,
+            'pro': 0x2009
+        }
+
+        # Έλεγχος αν δόθηκε σωστός τύπος
+        if device_type not in self.PRODUCT_IDS:
+            print(f"⚠️ Unknown device type '{device_type}', defaulting to 'right'")
+            device_type = 'right'
+
+        self.target_pid = self.PRODUCT_IDS[device_type]
+        self.device_type = device_type
+
         self.device = None
         self.global_packet_number = 0
 
-        # --- CALIBRATION VARS ---
+        # ... (τα υπόλοιπα variables: bias, history, κλπ παραμένουν ίδια) ...
         self.bias_x = 0
         self.bias_y = 0
         self.bias_z = 0
         self.DPS_FACTOR = 0.06103
 
-        # --- AUTO-CALIBRATION VARS (NEW) ---
-        # Κρατάμε τις τελευταίες 50 μετρήσεις (περίπου 0.7 δευτερόλεπτα ιστορικού)
+        # Auto-calib vars
         self.history_len = 50
         self.gyro_history_x = deque(maxlen=self.history_len)
         self.gyro_history_y = deque(maxlen=self.history_len)
         self.gyro_history_z = deque(maxlen=self.history_len)
-
-        self.still_start_time = None # Πότε ξεκίνησε να είναι ακίνητο
-        self.required_still_time = 2.0 # Πόσα δευτερόλεπτα ακινησίας απαιτούνται
+        self.still_start_time = None
+        self.required_still_time = 2.0
 
     def open(self):
-        print(f"🔍 Scanning for {'LEFT' if self.is_left else 'RIGHT'} Joy-Con...")
+        print(f"🔍 Scanning for {self.device_type.upper()} Controller (PID: {hex(self.target_pid)})...")
         for device_info in hid.enumerate(self.VENDOR_ID):
-            if device_info['product_id'] == self.TARGET_PRODUCT_ID:
-                print(f"✅ Found Joy-Con ({'Left' if self.is_left else 'Right'})")
+            if device_info['product_id'] == self.target_pid:
+                print(f"✅ Found Nintendo Device: {self.device_type.upper()}")
                 try:
                     self.device = hid.device()
                     self.device.open_path(device_info['path'])
