@@ -28,3 +28,27 @@ git clone https://github.com/[your-username]/adaptive-motion-thesis.git
 
 # Install dependencies
 pip install -r requirements.txt
+```
+### 3. Unity Setup
+   - Open the unity_project folder in Unity Hub.
+   - Open Scenes/MainExperiment.unity.
+   - Press Play.
+## Usage
+   #### Run Navigation (Precision Mode)
+   To start the main navigation script with dynamic filtering:
+   ```code
+   python tests/experiments/main_nav_precision.py
+   ```
+   - Controls:
+- - Move: Rotate controller (Gyro).
+- - Precision Mode: Hold ZL (Left) or ZR (Pro) trigger.
+#### Run Visualization (Cardiogram)
+   To see real-time filter performance comparison:
+   ```code
+   python tests/experiments/live_filter_comparison.py
+   ```
+   ### Project Structure
+   - ```src/:``` Core Python logic (Drivers, Filters, Mapping).
+   - ```tests/:``` Experimental scripts and plotting tools.
+   - ```unity_project/:``` The 3D visualization environment.
+   - ```docs/:``` Progress reports and diagrams.
