@@ -2,6 +2,7 @@
 
 > **Diploma Thesis**  
 > **Student:** Tzortzakis Alkiviadis
+> 
 > **Supervisor:** Sintoris Christos  
 > **University:** University of Patras
 
