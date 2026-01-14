@@ -31,3 +31,7 @@
 *.pdb
 *.opendb
 *.VC.db
+/unity_project/Library/
+/unity_project/Logs/
+/.idea/
+/unity_project/UserSettings/
