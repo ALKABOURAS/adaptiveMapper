@@ -92,7 +92,7 @@ def run_precision_navigation():
             cursor_y = max(-12, min(12, cursor_y))
 
             sender.send_data(cursor_x, cursor_y, 0)
-            time.sleep(0.001)
+
 
     except KeyboardInterrupt:
         joy.close()
