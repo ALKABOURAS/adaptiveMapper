@@ -161,6 +161,10 @@ class JoyConDriver:
         final_y = raw_y - self.bias_y
         final_z = raw_z - self.bias_z
 
+        final_z = -final_z  # Αντιστροφή άξονα Z για σωστή κατεύθυνση
+        final_y = -final_y  # Αντιστροφή άξονα Y για σωστή κατεύθυνση
+        final_x = -final_x  # Αντιστροφή άξονα X για σωστή κατεύθυνση
+
         if was_calibrated:
             print(f"✨ Auto-Calibrated! New Bias -> X:{self.bias_x:.1f}, Y:{self.bias_y:.1f}")
 
