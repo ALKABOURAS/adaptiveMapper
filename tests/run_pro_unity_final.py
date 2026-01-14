@@ -20,16 +20,16 @@ def run_final_link():
 
     # 2. Pipeline Init
     # Χρησιμοποιούμε Adaptive Mapper για να έχουμε Precision Mode
-    mapper = AdaptiveMapper(threshold=2.0, precision_factor=0.5)
+    mapper = AdaptiveMapper(threshold=8.0, precision_factor=0.6)
 
     # Φίλτρα Kalman (ρυθμισμένα για Pro Controller που είναι σταθερό)
-    kf_x = SimpleKalmanFilter(process_noise=1.0, measurement_noise=0.01)
-    kf_y = SimpleKalmanFilter(process_noise=1.0, measurement_noise=0.01)
+    kf_x = SimpleKalmanFilter(process_noise=1.0, measurement_noise=2.0)
+    kf_y = SimpleKalmanFilter(process_noise=1.0, measurement_noise=2.0)
 
     sender = UDPSender(port=5005)
 
     # --- ΡΥΘΜΙΣΕΙΣ (TUNING) ---
-    SENSITIVITY = 100 # Όσο πιο μικρό, τόσο πιο γρήγορο.
+    SENSITIVITY = 30 # Όσο πιο μικρό, τόσο πιο γρήγορο.
     INVERT_Y = True    # Αν πηγαίνει ανάποδα το πάνω-κάτω, κάντο False
     INVERT_X = True   # Αν πηγαίνει ανάποδα το αριστερά-δεξιά, κάντο True
 
