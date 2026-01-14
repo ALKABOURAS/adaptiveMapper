@@ -2,7 +2,61 @@
 <module type="PYTHON_MODULE" version="4">
   <component name="NewModuleRootManager" inherit-compiler-output="true">
     <exclude-output />
-    <content url="file://$MODULE_DIR$" />
+    <content url="file://$MODULE_DIR$">
+      <excludeFolder url="file://$MODULE_DIR$/.idea/inspectionProfiles" />
+      <excludeFolder url="file://$MODULE_DIR$/unity_project/Library/BuildInstructions" />
+      <excludeFolder url="file://$MODULE_DIR$/unity_project/Library/PackageCache/com.unity.2d.aseprite@809e3a168ff7" />
+      <excludeFolder url="file://$MODULE_DIR$/unity_project/Library/PackageCache/com.unity.2d.common@51e9484895c4" />
+      <excludeFolder url="file://$MODULE_DIR$/unity_project/Library/PackageCache/com.unity.2d.psdimporter@9abe0f7cac7e" />
+      <excludeFolder url="file://$MODULE_DIR$/unity_project/Library/PackageCache/com.unity.2d.sprite@82f01c8c75ca" />
+      <excludeFolder url="file://$MODULE_DIR$/unity_project/Library/PackageCache/com.unity.2d.spriteshape@0738bab11647" />
+      <excludeFolder url="file://$MODULE_DIR$/unity_project/Library/PackageCache/com.unity.2d.tilemap.extras@3dde84bf3867" />
+      <excludeFolder url="file://$MODULE_DIR$/unity_project/Library/PackageCache/com.unity.2d.tilemap@d1f73c185ae9" />
+      <excludeFolder url="file://$MODULE_DIR$/unity_project/Library/PackageCache/com.unity.2d.tooling@55ff0338cdce" />
+      <excludeFolder url="file://$MODULE_DIR$/unity_project/Library/PackageCache/com.unity.collections@aea9d3bd5e19" />
+      <excludeFolder url="file://$MODULE_DIR$/unity_project/Library/PackageCache/com.unity.ext.nunit@d8c07649098d" />
+      <excludeFolder url="file://$MODULE_DIR$/unity_project/Library/PackageCache/com.unity.ide.rider@1f60b3138684" />
+      <excludeFolder url="file://$MODULE_DIR$/unity_project/Library/PackageCache/com.unity.ide.visualstudio@74aa435fc4bb" />
+      <excludeFolder url="file://$MODULE_DIR$/unity_project/Library/PackageCache/com.unity.mathematics@19a9377c4ffa" />
+      <excludeFolder url="file://$MODULE_DIR$/unity_project/Library/PackageCache/com.unity.multiplayer.center@f01f4ba8d00a" />
+      <excludeFolder url="file://$MODULE_DIR$/unity_project/Library/PackageCache/com.unity.nuget.mono-cecil@ecb9724e46ff" />
+      <excludeFolder url="file://$MODULE_DIR$/unity_project/Library/PackageCache/com.unity.render-pipelines.universal-config@8dc1aab4af1d" />
+      <excludeFolder url="file://$MODULE_DIR$/unity_project/Library/PackageCache/com.unity.searcher@d45a78918735" />
+      <excludeFolder url="file://$MODULE_DIR$/unity_project/Library/PackageCache/com.unity.test-framework.performance@0840f58e4562" />
+      <excludeFolder url="file://$MODULE_DIR$/unity_project/Library/ShaderCache/compute/BufferCopyTest8ba6" />
+      <excludeFolder url="file://$MODULE_DIR$/unity_project/Library/ShaderCache/compute/CopyDepthToBuffer6666" />
+      <excludeFolder url="file://$MODULE_DIR$/unity_project/Library/ShaderCache/compute/Debug4d40" />
+      <excludeFolder url="file://$MODULE_DIR$/unity_project/Library/ShaderCache/compute/Defraga183" />
+      <excludeFolder url="file://$MODULE_DIR$/unity_project/Library/ShaderCache/compute/Evictionc9f2" />
+      <excludeFolder url="file://$MODULE_DIR$/unity_project/Library/ShaderCache/compute/FlatNormalResolution134e" />
+      <excludeFolder url="file://$MODULE_DIR$/unity_project/Library/ShaderCache/compute/FunctionTestsGroup77f6" />
+      <excludeFolder url="file://$MODULE_DIR$/unity_project/Library/ShaderCache/compute/FunctionTestsWave7cce" />
+      <excludeFolder url="file://$MODULE_DIR$/unity_project/Library/ShaderCache/compute/PatchAllocation3d9f" />
+      <excludeFolder url="file://$MODULE_DIR$/unity_project/Library/ShaderCache/compute/RestirEstimationb5db" />
+      <excludeFolder url="file://$MODULE_DIR$/unity_project/Library/ShaderCache/compute/RestirSpatial8bf7" />
+      <excludeFolder url="file://$MODULE_DIR$/unity_project/Library/ShaderCache/compute/ScreenResolveLookup4d27" />
+      <excludeFolder url="file://$MODULE_DIR$/unity_project/Library/ShaderCache/compute/ScreenResolveUpsampling7c30" />
+      <excludeFolder url="file://$MODULE_DIR$/unity_project/Library/ShaderCache/compute/Scrolling47bb" />
+      <excludeFolder url="file://$MODULE_DIR$/unity_project/Library/ShaderCache/compute/SpatialFiltering63e5" />
+      <excludeFolder url="file://$MODULE_DIR$/unity_project/Library/ShaderCache/compute/TemporalFilteringc235" />
+      <excludeFolder url="file://$MODULE_DIR$/unity_project/Library/ShaderCache/shader/TerrainLit69c1" />
+      <excludeFolder url="file://$MODULE_DIR$/unity_project/Library/ShaderCache/shader/TerrainLitBase2132" />
+      <excludeFolder url="file://$MODULE_DIR$/unity_project/Library/ShaderCache/shadergraph" />
+      <excludeFolder url="file://$MODULE_DIR$/unity_project/Library/ShaderCache/temp" />
+      <excludeFolder url="file://$MODULE_DIR$/unity_project/Library/ShaderCache/urtshader/DynamicGISkyOcclusion5a2a/01" />
+      <excludeFolder url="file://$MODULE_DIR$/unity_project/Library/ShaderCache/urtshader/RestirCandidateTemporalad3a" />
+      <excludeFolder url="file://$MODULE_DIR$/unity_project/Library/ShaderCache/urtshader/RisEstimation713f" />
+      <excludeFolder url="file://$MODULE_DIR$/unity_project/Library/ShaderCache/urtshader/TraceRays1142" />
+      <excludeFolder url="file://$MODULE_DIR$/unity_project/Library/ShaderCache/urtshader/TraceRaysAndFetchAttributesfbc5" />
+      <excludeFolder url="file://$MODULE_DIR$/unity_project/Library/ShaderCache/urtshader/TraceRenderingLayerMask94a0/01" />
+      <excludeFolder url="file://$MODULE_DIR$/unity_project/Library/ShaderCache/urtshader/TraceTransparentRays6513" />
+      <excludeFolder url="file://$MODULE_DIR$/unity_project/Library/ShaderCache/urtshader/TraceVirtualOffsetff2c/01" />
+      <excludeFolder url="file://$MODULE_DIR$/unity_project/Library/ShaderCache/urtshader/UniformEstimation94a3" />
+      <excludeFolder url="file://$MODULE_DIR$/unity_project/Library/TempArtifacts" />
+      <excludeFolder url="file://$MODULE_DIR$/venv/Lib" />
+      <excludeFolder url="file://$MODULE_DIR$/venv/Scripts" />
+      <excludeFolder url="file://$MODULE_DIR$/venv/share" />
+    </content>
     <orderEntry type="jdk" jdkName="Python 3.10 (adaptiveMapper)" jdkType="Python SDK" />
     <orderEntry type="sourceFolder" forTests="false" />
   </component>
