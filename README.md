@@ -1,4 +1,4 @@
-# Adaptive Motion Navigation in 3D Environments 🎮
+# Adaptive Motion Navigation in 3D Environments 
 
 > **Diploma Thesis**  
 > **Student:** Tzortzakis Alkiviadis
