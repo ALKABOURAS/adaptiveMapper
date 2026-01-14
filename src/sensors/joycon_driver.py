@@ -132,43 +132,65 @@ class JoyConDriver:
         return False
 
     def _read_raw_dps(self):
-        """Helper function: Διαβάζει DPS χωρίς να αφαιρεί το bias."""
+        """Helper function: Διαβάζει DPS και ΚΟΥΜΠΙΑ (χωρίς bias)."""
         if not self.device: return None
         report = self.device.read(64)
         if not report or report[0] != 0x30: return None
 
+        # --- Gyro Parsing ---
         raw_gx = report[19] | (report[20] << 8)
         raw_gy = report[21] | (report[22] << 8)
         raw_gz = report[23] | (report[24] << 8)
+
         def to_signed(n): return n - 65536 if n > 32767 else n
 
-        return (to_signed(raw_gx)*self.DPS_FACTOR,
-                to_signed(raw_gy)*self.DPS_FACTOR,
-                to_signed(raw_gz)*self.DPS_FACTOR)
+        dps_x = to_signed(raw_gx) * self.DPS_FACTOR
+        dps_y = to_signed(raw_gy) * self.DPS_FACTOR
+        dps_z = to_signed(raw_gz) * self.DPS_FACTOR
+
+        # --- Button Parsing (ZL / ZR) ---
+        # Byte 5, Bit 7 (0x80) -> ZL (Left Trigger)
+        # Byte 3, Bit 7 (0x80) -> ZR (Right Trigger)
+
+        is_triggered = False
+        if self.device_type == 'left':
+            if report[5] & 0x80: is_triggered = True # ZL
+        else:
+            if report[3] & 0x80: is_triggered = True # ZR (ή Pro Controller)
+
+        # Επιστρέφουμε 4 τιμές τώρα
+        return dps_x, dps_y, dps_z, is_triggered
 
     def read_imu_dps(self):
-        """Η κύρια συνάρτηση που καλείς. Κάνει ΚΑΙ τον έλεγχο auto-calib."""
+        """Η κύρια συνάρτηση. Επιστρέφει (x, y, z, is_trigger_pressed)."""
+
+        # 1. Διαβάζουμε τα Raw δεδομένα (πλέον επιστρέφει 4 πράγματα)
         raw_data = self._read_raw_dps()
         if not raw_data: return None
 
-        raw_x, raw_y, raw_z = raw_data
+        # Unpacking (ξεπακετάρισμα) των 4 τιμών
+        raw_x, raw_y, raw_z, is_trigger = raw_data
 
-        # 1. Τρέξε τον έλεγχο (παρασκηνιακά)
+        # 2. Τρέξε τον έλεγχο Auto-Calibration (παρασκηνιακά)
+        # Στέλνουμε μόνο τα x,y,z στο calibration, το κουμπί δεν επηρεάζει
         was_calibrated = self.check_auto_calibration(raw_x, raw_y, raw_z)
 
-        # 2. Επίστρεψε το διορθωμένο
+        # 3. Αφαίρεση Bias
         final_x = raw_x - self.bias_x
         final_y = raw_y - self.bias_y
         final_z = raw_z - self.bias_z
 
-        final_z = -final_z  # Αντιστροφή άξονα Z για σωστή κατεύθυνση
-        final_y = -final_y  # Αντιστροφή άξονα Y για σωστή κατεύθυνση
-        final_x = -final_x  # Αντιστροφή άξονα X για σωστή κατεύθυνση
+        # 4. Τα Inversions που έχεις ορίσει (Hardcoded)
+        final_z = -final_z
+        final_y = -final_y
+        final_x = -final_x
 
         if was_calibrated:
             print(f"✨ Auto-Calibrated! New Bias -> X:{self.bias_x:.1f}, Y:{self.bias_y:.1f}")
 
-        return final_x, final_y, final_z
+        # 5. Επιστροφή των τελικών τιμών ΚΑΙ του κουμπιού
+        return final_x, final_y, final_z, is_trigger
+
 
     def close(self):
         if self.device: self.device.close()
