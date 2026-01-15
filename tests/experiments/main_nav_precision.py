@@ -46,16 +46,23 @@ def run_precision_navigation():
 
             # B. DYNAMIC TUNING (Το "Αυτί" που ζήτησες)
             if is_precision_btn:
-                # --- SNIPER MODE ---
-                # 1. Αλλάζουμε το φίλτρο να γίνει "βαρύ" (Limo mode)
-                # Πολύ μικρό min_cutoff για να εξαφανίσει το τρέμουλο
-                oe_yaw.min_cutoff   = 0.01
-                oe_pitch.min_cutoff = 0.01
-                oe_yaw.beta   = 0.5 # Αγνοεί τις γρήγορες κινήσεις
-                oe_pitch.beta = 0.5
+                # --- SNIPER MODE (TUNED) ---
+                # Παλιό: 0.01 -> Πολύ βαρύ (προκαλεί ρόμβους)
+                # Νέο: 0.1 -> Αρκετό για να κόβει τρέμουλο, αλλά επιτρέπει καμπύλες
+                oe_yaw.min_cutoff   = 0.05
+                oe_pitch.min_cutoff = 0.05
 
-                CURRENT_SENSITIVITY = 60.0 # Αργό, αλλά όχι υπερβολικό για να μην κάνει phase out
-                MAX_SPEED_LIMIT = 0.1      # ΚΟΦΤΗΣ: Μέγιστη κίνηση ανά frame (Unity units)
+                # Παλιό: 0.5 -> Πολύ αργή αντίδραση
+                # Νέο: 1.0 -> Λίγο πιο ζωντανό
+                oe_yaw.beta   = 0.8
+                oe_pitch.beta = 0.8
+
+                # Παλιό: 60.0 -> Προκαλεί stuttering
+                # Νέο: 40.0 -> Πιο γρήγορο, αλλά ελέγχεται από το Clamping
+                CURRENT_SENSITIVITY = 50.0
+
+                # Το Clamping το κρατάμε ίδιο, γιατί δουλεύει καλά για τον "κόφτη"
+                MAX_SPEED_LIMIT = 0.5
 
             else:
                 # --- NORMAL MODE ---
