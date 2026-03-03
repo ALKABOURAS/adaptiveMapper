@@ -8,6 +8,7 @@ sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
 from src.sensors.joycon_driver import JoyConDriver
 from src.filters.one_euro import OneEuroFilter
 from src.networking.udp_client import UDPSender
+from src.processing.crosstalk import SignalProcessor
 
 def clamp(n, minn, maxn):
     return max(min(maxn, n), minn)
@@ -17,7 +18,7 @@ def run_precision_navigation():
     joy = JoyConDriver(device_type='left') # Χρησιμοποίησε το L (ZL trigger)
     if not joy.open(): return
 
-    print("⚖️ Auto-Calibration active...")
+    print("Auto-Calibration active...")
 
     # 2. Filters (One Euro) - Αρχικές τιμές για NORMAL mode
     # Beta: Πόσο "ακούει" την ταχύτητα. Μεγάλο = Γρήγορο.
@@ -29,9 +30,9 @@ def run_precision_navigation():
 
     cursor_x, cursor_y = 0.0, 0.0
 
-    print("🚀 PRECISION MODE TEST")
-    print("👉 Hold ZL/Trigger: SNIPER MODE (Heavy filtering + Speed Limit)")
-    print("👉 Release: NORMAL MODE (Fast response)")
+    print("PRECISION MODE TEST")
+    print("Hold ZL/Trigger: SNIPER MODE (Heavy filtering + Speed Limit)")
+    print("Release: NORMAL MODE (Fast response)")
 
     try:
         while True:
@@ -79,6 +80,11 @@ def run_precision_navigation():
             current_ts = time.time()
             clean_yaw   = oe_yaw.update(input_yaw, current_ts)
             clean_pitch = oe_pitch.update(input_pitch, current_ts)
+
+            # Process Crosstalk
+            clean_yaw, clean_pitch = SignalProcessor.suppress_crosstalk(
+                clean_yaw, clean_pitch, ratio_threshold=3.5, min_activity=15.0
+            )
 
             # D. Calculate Step
             step_x = clean_yaw / CURRENT_SENSITIVITY

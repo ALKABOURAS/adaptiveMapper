@@ -12,33 +12,7 @@ sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 from src.sensors.joycon_driver import JoyConDriver
 from src.filters.kalman import SimpleKalmanFilter
 from src.filters.one_euro import OneEuroFilter
-
-def suppress_crosstalk(val_x, val_y, ratio_threshold=4.0, min_activity=10.0):
-    """
-    Αν ο ένας άξονας είναι πολύ πιο δυνατός από τον άλλον, μειώνει τον αδύναμο.
-
-    ratio_threshold: Πόσες φορές μεγαλύτερος πρέπει να είναι ο κυρίαρχος άξονας.
-    min_activity: Ελάχιστη ταχύτητα για να ενεργοποιηθεί η λογική (ώστε να μην χαλάμε τις μικρο-διορθώσεις).
-    """
-    abs_x = abs(val_x)
-    abs_y = abs(val_y)
-
-    # Αν δεν υπάρχει σημαντική κίνηση, μην κάνεις τίποτα (για να δουλεύει το precision)
-    if abs_x < min_activity and abs_y < min_activity:
-        return val_x, val_y
-
-    # Έλεγχος Κυριαρχίας
-    # Αν το X είναι κυρίαρχο (π.χ. 4 φορές μεγαλύτερο από το Y)
-    if abs_x > abs_y * ratio_threshold:
-        # Θεωρούμε το Y ως θόρυβο/crosstalk και το μειώνουμε δραματικά
-        val_y = val_y * 0.1 # Το αφήνουμε ελάχιστα ζωντανό ή το κάνουμε 0.0
-
-    # Αν το Y είναι κυρίαρχο
-    elif abs_y > abs_x * ratio_threshold:
-        # Θεωρούμε το X ως θόρυβο
-        val_x = val_x * 0.1
-
-    return val_x, val_y
+from src.processing.crosstalk import SignalProcessor
 
 def run_2d_cardiogram():
     # 1. SETUP HARDWARE
@@ -46,7 +20,7 @@ def run_2d_cardiogram():
     joy = JoyConDriver(device_type='left')
     if not joy.open(): return
 
-    print("⚖️ Auto-calibrating... Please stay still for 2 seconds.")
+    print("Auto-calibrating... Please stay still for 2 seconds.")
     time.sleep(2)
 
     # 2. SETUP FILTERS (Σύγκριση)
@@ -98,18 +72,14 @@ def run_2d_cardiogram():
     ax_pit.legend(loc='upper right')
     ax_pit.grid(True)
 
-    print("🚀 LIVE 2-AXIS CARDIOGRAM STARTED!")
-    print("-----------------------------------")
-    print("🔵 Blue: Kalman (R=10) -> Smooth but Laggier")
-    print("🟢 Green: 1€ Filter (beta=4) -> Fast & Smooth")
-    print("-----------------------------------")
-
     try:
         while True:
             # A. Read Sensors
             current_ts = time.time()
             data = joy.read_imu_dps()
-            if not data: continue
+            if not data:
+                # time.sleep(0.001)
+                continue
 
             raw_x, raw_y, raw_z, is_triggered = data
 
@@ -127,8 +97,8 @@ def run_2d_cardiogram():
             o_p = oe_pitch.update(in_pitch, current_ts)
 
             # Crosstalk Suppression
-            k_y, k_p = suppress_crosstalk(k_y, k_p, ratio_threshold=3.5, min_activity=15.0)
-            o_y, o_p = suppress_crosstalk(o_y, o_p, ratio_threshold=3.5, min_activity=15.0)
+            k_y, k_p = SignalProcessor.suppress_crosstalk(k_y, k_p, ratio_threshold=3.5, min_activity=15.0)
+            o_y, o_p = SignalProcessor.suppress_crosstalk(o_y, o_p, ratio_threshold=3.5, min_activity=15.0)
 
             # C. Update Buffers
             raw_yaw_buf.append(in_yaw)

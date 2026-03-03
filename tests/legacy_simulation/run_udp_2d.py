@@ -21,7 +21,7 @@ def run_2d_simulation():
     mapper = AdaptiveMapper(threshold=3.0, precision_factor=0.15)
     sender = UDPSender(port=5005)
 
-    print("🚀 Sending 2D Data (Circles) to Unity...")
+    print("Sending 2D Data (Circles) to Unity...")
 
     try:
         while True:
@@ -44,7 +44,7 @@ def run_2d_simulation():
             time.sleep(0.016)
 
     except KeyboardInterrupt:
-        print("\n🛑 Stopped.")
+        print("\nStopped.")
 
 if __name__ == "__main__":
     run_2d_simulation()

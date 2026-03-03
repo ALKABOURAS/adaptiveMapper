@@ -13,10 +13,10 @@ def run_final_link():
     # 1. Hardware Init
     joy = JoyConDriver(device_type='pro')
     if not joy.open():
-        print("❌ Connect Pro Controller first!")
+        print("Connect Pro Controller first!")
         return
 
-    print("⚖️  Auto-Calibration active. Leave still if drifting occurs.")
+    print("Auto-Calibration active. Leave still if drifting occurs.")
 
     # 2. Pipeline Init
     # Χρησιμοποιούμε Adaptive Mapper για να έχουμε Precision Mode
@@ -36,7 +36,7 @@ def run_final_link():
     # Θέση Κέρσορα
     cursor_x, cursor_y = 0.0, 0.0
 
-    print("🚀 PRO CONTROLLER LINKED TO UNITY")
+    print("PRO CONTROLLER LINKED TO UNITY")
     print("---------------------------------")
     print("Press Ctrl+C to stop.")
 

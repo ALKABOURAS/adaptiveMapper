@@ -1,4 +1,4 @@
-# src/filters/crosstalk_suppression.py
+# src/filters/crosstalk.py
 import math
 
 

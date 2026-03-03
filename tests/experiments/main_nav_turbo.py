@@ -16,7 +16,7 @@ def run_turbo_navigation():
     joy = JoyConDriver(device_type='left')
     if not joy.open(): return
 
-    print("⚖️ Auto-Calibration active...")
+    print("⚖Auto-Calibration active...")
 
     # 2. Filters
     oe_yaw   = OneEuroFilter(min_cutoff=0.1, beta=4.0, d_cutoff=1.0) # Πολύ σταθερό
@@ -37,9 +37,9 @@ def run_turbo_navigation():
 
     cursor_x, cursor_y = 0.0, 0.0
 
-    print("🚀 NAVIGATION WITH TURBO (SL BUTTON)")
-    print(f"👉 Default: Slow/Precise (Sens: {SENSITIVITY_NORMAL})")
-    print(f"👉 Hold SL: TURBO MODE (Sens: {SENSITIVITY_TURBO})")
+    print("NAVIGATION WITH TURBO (SL BUTTON)")
+    print(f"Default: Slow/Precise (Sens: {SENSITIVITY_NORMAL})")
+    print(f"Hold SL: TURBO MODE (Sens: {SENSITIVITY_TURBO})")
 
     try:
         while True:
@@ -69,7 +69,6 @@ def run_turbo_navigation():
                 final_yaw = clean_yaw
                 final_pitch = clean_pitch
                 current_sens = SENSITIVITY_TURBO
-                print("🔥 TURBO!")
             else:
                 # NORMAL MODE:
                 # 1. Χρησιμοποιούμε Adaptive Mapper (Precision)

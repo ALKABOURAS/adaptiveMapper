@@ -24,7 +24,7 @@ def run_with_plot():
     # device_type='pro' ή 'right' ανάλογα τι έχεις
     joy = JoyConDriver(device_type='left')
     if not joy.open():
-        print("❌ Controller not found")
+        print("Controller not found")
         return
 
     # Φίλτρα & Mapper
@@ -47,8 +47,8 @@ def run_with_plot():
     timestamps = []
     start_time = time.time()
 
-    print("🚀 LIVE RECORDING! Move the controller...")
-    print("🛑 Press Ctrl+C to STOP and VIEW THE GRAPH.")
+    print("LIVE RECORDING! Move the controller...")
+    print("Press Ctrl+C to STOP and VIEW THE GRAPH.")
 
     try:
         while True:
@@ -96,7 +96,7 @@ def run_with_plot():
 
     except KeyboardInterrupt:
         joy.close()
-        print("\n📊 Generating Plot... Please wait.")
+        print("\nGenerating Plot... Please wait.")
 
         # --- PLOTTING CODE in 2axis---
         fig, axs = plt.subplots(2, 1, figsize=(12, 10), sharex=True)
@@ -120,7 +120,7 @@ def run_with_plot():
         axs[1].legend(loc='upper right')
         axs[1].grid(True)
 
-        print("💾 Saving plot to 'performance_graph.png'...")
+        print("Saving plot to 'performance_graph.png'...")
         plt.savefig(os.path.join(results_dir, f"{timestamp}_performance_graph.png"))
         plt.show()
 

@@ -15,10 +15,10 @@ def run_navigation():
     # Διάλεξε 'pro', 'left', ή 'right'
     joy = JoyConDriver(device_type='left')
     if not joy.open():
-        print("❌ Controller not found.")
+        print("Controller not found.")
         return
 
-    print("⚖️  Auto-Calibration active. Leave still if drifting.")
+    print("Auto-Calibration active. Leave still if drifting.")
 
     # 2. Filters Init (1€ Filter)
     # min_cutoff: 0.5 -> Σταθερότητα όταν είναι ακίνητο
@@ -39,7 +39,7 @@ def run_navigation():
 
     cursor_x, cursor_y = 0.0, 0.0
 
-    print(f"🚀 NAVIGATION STARTED | Sens:{SENSITIVITY} | InvX:{INVERT_X} | InvY:{INVERT_Y}")
+    print(f"ΝAVIGATION STARTED | Sens:{SENSITIVITY} | InvX:{INVERT_X} | InvY:{INVERT_Y}")
     print("Press Ctrl+C to stop.")
 
     try:
@@ -93,7 +93,7 @@ def run_navigation():
 
     except KeyboardInterrupt:
         joy.close()
-        print("\n🛑 Navigation Stopped.")
+        print("\nNavigation Stopped.")
 
 if __name__ == "__main__":
     run_navigation()

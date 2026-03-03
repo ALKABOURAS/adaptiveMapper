@@ -26,7 +26,7 @@ def run_live_simulation():
     timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     csv_filename = os.path.join(results_dir, f"{timestamp}_live_data.csv")
 
-    print(f"🚀 Sending Data to Unity... Logging to: {csv_filename}")
+    print(f"Sending Data to Unity... Logging to: {csv_filename}")
     print("Press Ctrl+C to stop.")
 
     # Ανοίγουμε το αρχείο για γράψιμο
@@ -53,8 +53,8 @@ def run_live_simulation():
                 time.sleep(0.016) # ~60 FPS
 
         except KeyboardInterrupt:
-            print("\n🛑 Stopped.")
-            print(f"✅ Data saved to {csv_filename}")
+            print("\nStopped.")
+            print(f"Data saved to {csv_filename}")
 
 if __name__ == "__main__":
     run_live_simulation()

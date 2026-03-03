@@ -72,7 +72,7 @@ def run_experiment():
     full_path = os.path.join(results_dir, filename)
 
     plt.savefig(full_path, dpi=300)
-    print(f"💾 Graph saved: {full_path}")
+    print(f"Graph saved: {full_path}")
 
     plt.show()
 

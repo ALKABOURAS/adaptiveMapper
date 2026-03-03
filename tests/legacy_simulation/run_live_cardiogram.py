@@ -53,10 +53,10 @@ def run_cardiogram():
     ax.legend(loc='upper right')
     ax.grid(True)
 
-    print("🚀 LIVE CARDIOGRAM STARTED!")
-    print("🟢 Green: 1€ Filter (Adaptive)")
-    print("🔵 Blue: Kalman (Fixed)")
-    print("⚪ Gray: Raw Noise")
+    print("LIVE CARDIOGRAM STARTED!")
+    print("Green: 1€ Filter (Adaptive)")
+    print("Blue: Kalman (Fixed)")
+    print("Gray: Raw Noise")
 
     try:
         while True:

@@ -15,9 +15,9 @@ def run_test():
 
     # ΠΡΟΣΟΧΗ: ΔΕΝ καλούμε το joy.calibrate() στην αρχή!
     # Θέλουμε να δούμε το Drift να συμβαίνει.
-    print("⚠️  WARNING: Starting WITHOUT calibration.")
-    print("➡️  Ο κύβος θα κουνιέται μόνος του (Drift).")
-    print("➡️  Άσε το Joy-Con στο τραπέζι και περίμενε 2-3 δευτερόλεπτα...")
+    print("WARNING: Starting WITHOUT calibration.")
+    print("Ο κύβος θα κουνιέται μόνος του (Drift).")
+    print("➡Άσε το Joy-Con στο τραπέζι και περίμενε 2-3 δευτερόλεπτα...")
 
     pos_x, pos_y = 0.0, 0.0
 
