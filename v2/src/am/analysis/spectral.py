@@ -148,8 +148,152 @@ def band_report(signal, rate_hz: float) -> dict[str, float]:
     tremor_mask = (freqs >= BAND_TREMOR[0]) & (freqs <= BAND_TREMOR[1])
     if np.any(tremor_mask):
         out["tremor_peak_hz"] = float(freqs[tremor_mask][np.argmax(psd[tremor_mask])])
+        out["tremor_prominence"] = tremor_prominence(freqs, psd)
+        out["tremor_band_power"] = band_power(freqs, psd, BAND_TREMOR)
     out["total_power"] = total
     return out
+
+
+def find_tremor_peak(
+    freqs, psd, search: tuple[float, float] = (6.0, 14.0)
+) -> tuple[float, float]:
+    """Locate a genuine tremor peak, returning ``(frequency_hz, prominence)``.
+
+    Taking the plain argmax over a search window is unsafe here, and the failure
+    is not hypothetical: during fast movement, 88 % of the power sits below 5 Hz,
+    so the monotonically falling tail of the voluntary motion is the largest
+    value anywhere in 6-14 Hz. The argmax then lands on the lower edge of the
+    window and reports it as a "tremor peak at 6.01 Hz", which would have
+    inflated an apparent tremor-frequency shift from about 0.9 Hz to 4 Hz.
+
+    This function instead removes the broadband trend first, by fitting a
+    straight line in log-log space across the search window, and then requires
+    the maximum of the residual to be an **interior local maximum**. A peak
+    sitting on the window boundary is a tail, not a resonance, and is rejected.
+
+    Returns ``(nan, nan)`` when no interior peak exists.
+    """
+    freqs = np.asarray(freqs, dtype=np.float64)
+    psd = np.asarray(psd, dtype=np.float64)
+
+    window = (freqs >= search[0]) & (freqs <= search[1]) & (psd > 0) & (freqs > 0)
+    if np.count_nonzero(window) < 7:
+        return (float("nan"), float("nan"))
+
+    f_w = freqs[window]
+    p_w = psd[window]
+
+    # Remove the broadband 1/f-like trend so that only local structure remains.
+    coeffs = np.polyfit(np.log10(f_w), np.log10(p_w), 1)
+    baseline = 10.0 ** np.polyval(coeffs, np.log10(f_w))
+    residual = p_w / baseline
+
+    interior = np.arange(1, residual.size - 1)
+    is_local_max = (residual[interior] > residual[interior - 1]) & (
+        residual[interior] > residual[interior + 1]
+    )
+    candidates = interior[is_local_max]
+    if candidates.size == 0:
+        return (float("nan"), float("nan"))
+
+    best = candidates[np.argmax(residual[candidates])]
+    return (float(f_w[best]), float(residual[best]))
+
+
+def find_tremor_peak_robust(
+    signal,
+    rate_hz: float,
+    search: tuple[float, float] = (6.0, 14.0),
+    windows: tuple[int, ...] = (512, 1024, 2048, 4096),
+    max_spread_hz: float = 0.5,
+) -> dict[str, float]:
+    """Locate a tremor peak and verify it does not depend on the window length.
+
+    A single Welch window can manufacture a peak. Longer windows give finer
+    frequency resolution but fewer segments to average, so the estimate becomes
+    noisy; shorter windows average well but may not resolve the peak. A genuine
+    resonance appears at the same frequency under all of them.
+
+    This check matters, and not in theory. On the measured recordings the
+    pointing condition returned 8.98, 8.98, 9.08, 9.03 Hz across the four
+    windows -- stable to within 0.1 Hz. The fast-movement condition returned
+    8.98, 12.89, 8.98, 8.11 Hz, because its spectrum is dominated by harmonics
+    of the repetitive voluntary movement, and which harmonic wins depends on the
+    resolution. Reading a single window there would have supported a claim of a
+    tremor-frequency shift that the data does not support.
+
+    Returns
+    -------
+    dict with ``peak_hz`` (median across windows), ``spread_hz``,
+    ``prominence`` (median), ``n_valid``, and ``stable``.
+    """
+    signal = np.asarray(signal, dtype=np.float64).ravel()
+    peaks, prominences = [], []
+    for nperseg in windows:
+        if nperseg > signal.size:
+            continue
+        freqs, psd = welch_psd(signal, rate_hz, nperseg=nperseg)
+        peak, prominence = find_tremor_peak(freqs, psd, search)
+        if np.isfinite(peak):
+            peaks.append(peak)
+            prominences.append(prominence)
+
+    if not peaks:
+        return {
+            "peak_hz": float("nan"),
+            "spread_hz": float("nan"),
+            "prominence": float("nan"),
+            "n_valid": 0.0,
+            "stable": 0.0,
+        }
+
+    peaks = np.asarray(peaks)
+    spread = float(peaks.max() - peaks.min())
+    return {
+        "peak_hz": float(np.median(peaks)),
+        "spread_hz": spread,
+        "prominence": float(np.median(prominences)),
+        "n_valid": float(peaks.size),
+        "stable": float(spread <= max_spread_hz and peaks.size >= 3),
+    }
+
+
+def tremor_prominence(freqs, psd) -> float:
+    """How much the 8-12 Hz peak stands above the surrounding spectrum.
+
+    Reporting only ``tremor_peak_hz`` is misleading, because the maximum of a
+    *flat* spectrum inside 8-12 Hz is still some frequency in 8-12 Hz. A
+    stationary recording will therefore appear to have a "tremor peak" when it
+    has nothing of the sort. Prominence distinguishes a genuine resonance from
+    the arbitrary argmax of a noise floor:
+
+    - below ~1.5 : no peak, the band is just part of a smooth spectrum
+    - 1.5 to 3   : weak
+    - above 3    : a real, localised peak
+
+    The baseline is the geometric mean of the 6-7 Hz and 13-15 Hz shoulders,
+    which brackets the tremor band without including it.
+    """
+    freqs = np.asarray(freqs)
+    psd = np.asarray(psd)
+    band = (freqs >= BAND_TREMOR[0]) & (freqs <= BAND_TREMOR[1])
+    low = (freqs >= 6.0) & (freqs < 7.0)
+    high = (freqs > 13.0) & (freqs <= 15.0)
+    if not (np.any(band) and np.any(low) and np.any(high)):
+        return float("nan")
+
+    positive = psd > 0
+    low &= positive
+    high &= positive
+    if not (np.any(low) and np.any(high)):
+        return float("nan")
+
+    baseline = np.exp(
+        0.5 * (np.log(psd[low]).mean() + np.log(psd[high]).mean())
+    )
+    if baseline <= 0:
+        return float("nan")
+    return float(psd[band].max() / baseline)
 
 
 def spectrogram(

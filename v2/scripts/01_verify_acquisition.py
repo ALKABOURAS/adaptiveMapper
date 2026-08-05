@@ -19,7 +19,7 @@ Questions answered
 
 Usage
 -----
-    python scripts/01_verify_acquisition.py --device right --duration 20
+    python scripts/01_verify_acquisition.py --device left --duration 20
 
 Move the controller in smooth sweeps during the recording. Frame-order
 detection needs actual motion; a stationary device gives no discontinuity to
@@ -107,36 +107,110 @@ def q1_frames_are_distinct(reports) -> np.ndarray:
     return all_frames
 
 
-def q2_frame_order(all_frames: np.ndarray) -> str:
-    """Determine frame ordering by minimising cross-report discontinuity."""
+ORDERS: dict[str, tuple[int, int, int]] = {
+    "OLDEST_FIRST": (0, 1, 2),
+    "NEWEST_FIRST": (2, 1, 0),
+}
+
+
+def reconstruct(all_frames: np.ndarray, order: str, axis: int = 2) -> np.ndarray:
+    """Flatten reports into one sample stream under a given frame ordering."""
+    return all_frames[:, list(ORDERS[order]), axis].reshape(-1)
+
+
+def report_rate_artifact_db(
+    all_frames: np.ndarray, order: str, imu_rate_hz: float, report_rate_hz: float
+) -> float:
+    """Excess power at the report rate, in dB above the local spectral floor.
+
+    The decisive test of frame ordering, and much sharper than total variation.
+
+    If the three frames are stitched together in the wrong temporal order, every
+    report boundary inserts an identical small discontinuity. Identical, evenly
+    spaced discontinuities are a *periodic* disturbance whose fundamental sits
+    exactly at the report rate. So the wrong ordering does not merely look
+    rougher -- it plants a spectral line at a known, predictable frequency that
+    has no physical counterpart in hand motion.
+
+    Hand movement has no mechanism for producing energy at 67 Hz. Any peak there
+    is an artefact of reconstruction, and the ordering that minimises it is the
+    correct one.
+    """
+    from am.analysis.spectral import welch_psd
+
+    signal = reconstruct(all_frames, order)
+    if signal.size < 512:
+        return float("nan")
+
+    freqs, psd = welch_psd(signal, imu_rate_hz)
+
+    # Narrow band around the report rate versus a nearby baseline that excludes
+    # it, so the comparison is against the local noise floor rather than the
+    # whole spectrum.
+    half_width = 3.0
+    peak = (freqs >= report_rate_hz - half_width) & (freqs <= report_rate_hz + half_width)
+    floor = (
+        (freqs >= report_rate_hz - 20.0)
+        & (freqs <= report_rate_hz + 20.0)
+        & ~peak
+        & (freqs > 15.0)
+    )
+    if not np.any(peak) or not np.any(floor):
+        return float("nan")
+
+    return float(10.0 * np.log10(psd[peak].max() / np.median(psd[floor])))
+
+
+def q2_frame_order(
+    all_frames: np.ndarray, imu_rate_hz: float, report_rate_hz: float
+) -> str:
+    """Determine frame ordering from the report-rate reconstruction artefact."""
     print("=" * 72)
     print("Q2  Which temporal order are the three frames in?")
     print("=" * 72)
 
-    def total_variation(order: tuple[int, int, int]) -> float:
-        # Concatenate all reports under this ordering and measure roughness.
-        # The correct ordering yields a continuous trajectory; the wrong one
-        # inserts a backward jump at every report boundary.
-        seq = all_frames[:, list(order), :].reshape(-1, 3)
+    def total_variation(order: str) -> float:
+        seq = all_frames[:, list(ORDERS[order]), :].reshape(-1, 3)
         return float(np.abs(np.diff(seq, axis=0)).sum())
 
-    tv_oldest = total_variation((0, 1, 2))
-    tv_newest = total_variation((2, 1, 0))
+    print(f"  Report rate measured at {report_rate_hz:.1f} Hz. A wrong ordering")
+    print(f"  plants a spectral line there; hand motion cannot.")
+    print()
+    print(f"  {'ordering':<16}{'total variation':>18}{'artefact @ report rate':>26}")
+    print("  " + "-" * 60)
 
-    print(f"  total variation, oldest-first (0,1,2) = {tv_oldest:12.1f}")
-    print(f"  total variation, newest-first (2,1,0) = {tv_newest:12.1f}")
-
-    ratio = max(tv_oldest, tv_newest) / max(min(tv_oldest, tv_newest), 1e-12)
-    if ratio < 1.02:
-        print(
-            "\n  RESULT: INCONCLUSIVE -- the two orderings differ by less than 2%.\n"
-            "          The device was probably too still. Re-run while moving it."
+    scores = {}
+    for name in ORDERS:
+        tv = total_variation(name)
+        artifact = report_rate_artifact_db(
+            all_frames, name, imu_rate_hz, report_rate_hz
         )
+        scores[name] = (tv, artifact)
+        print(f"  {name:<16}{tv:18.1f}{artifact:23.1f} dB")
+
+    tv_ratio = max(s[0] for s in scores.values()) / max(
+        min(s[0] for s in scores.values()), 1e-12
+    )
+    artifacts = {k: v[1] for k, v in scores.items()}
+    winner = min(artifacts, key=lambda k: artifacts[k])
+    margin = max(artifacts.values()) - min(artifacts.values())
+
+    print()
+    if tv_ratio < 1.02 or margin < 3.0:
+        print("  RESULT: INCONCLUSIVE -- the two orderings are too close.")
+        print("          The device was probably too still. Re-run while moving it.")
         return "inconclusive"
 
-    winner = "OLDEST_FIRST" if tv_oldest < tv_newest else "NEWEST_FIRST"
-    print(f"\n  RESULT: {winner}  (smoother by {(ratio - 1) * 100:.1f}%)")
+    print(f"  RESULT: {winner}")
+    print(f"          Artefact is {margin:.1f} dB lower than the alternative,")
+    print(f"          and total variation {(tv_ratio - 1) * 100:.0f}% smoother.")
     print(f"          Set FrameOrder.{winner} in the driver.")
+    if artifacts[winner] > 6.0:
+        print()
+        print(f"  ! Even the best ordering leaves a {artifacts[winner]:.1f} dB residual")
+        print("    at the report rate. The 5 ms inter-frame spacing may not be")
+        print("    exact. Worth investigating before spectral analysis above 50 Hz;")
+        print("    it does not affect the 0-15 Hz bands this study cares about.")
     print()
     return winner
 
@@ -212,29 +286,41 @@ def q3_true_sample_rate(reports) -> dict:
     }
 
 
-def make_figure(reports, all_frames, result, out_path: Path) -> None:
+def make_figure(reports, all_frames, result, order: str, out_path: Path) -> None:
     """Produce the Chapter 4 acquisition figure."""
     import matplotlib
 
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
 
+    good = order if order in ORDERS else "OLDEST_FIRST"
+    bad = "NEWEST_FIRST" if good == "OLDEST_FIRST" else "OLDEST_FIRST"
+    imu_rate = result["imu_rate_hz"]
+    report_rate = result["device"]["rate_hz"]
+
     fig, axes = plt.subplots(2, 2, figsize=(13, 8))
 
-    # (a) v1 vs v2 sampling of the same motion, yaw axis.
+    # (a) Correct vs incorrect frame ordering on the same reports.
+    #
+    # Plotting the wrong ordering alongside the right one is the point of this
+    # panel: the sawtooth it produces has a period of exactly one report, which
+    # is the time-domain face of the spectral line in panel (d).
     ax = axes[0, 0]
-    n_show = min(60, len(reports))
-    v2 = all_frames[:n_show, :, 2].reshape(-1)
-    t_v2 = np.arange(v2.size) * 0.005
-    v1 = all_frames[:n_show, 0, 2]
-    t_v1 = np.arange(v1.size) * 0.015
-    ax.plot(t_v2, v2, "-", lw=1.2, label=f"v2: all 3 frames ({result['imu_rate_hz']:.0f} Hz)")
-    ax.plot(t_v1, v1, "o--", ms=4, lw=1.0, alpha=0.8,
-            label=f"v1: frame 0 only ({result['host']['rate_hz']:.0f} Hz)")
+    n_show = min(60, len(all_frames))
+    window = all_frames[:n_show]
+    seq_good = window[:, list(ORDERS[good]), 2].reshape(-1)
+    seq_bad = window[:, list(ORDERS[bad]), 2].reshape(-1)
+    t = np.arange(seq_good.size) / imu_rate
+    ax.plot(t, seq_bad, "-", lw=1.0, alpha=0.55, color="tab:red",
+            label=f"{bad} (wrong): sawtooth at {report_rate:.0f} Hz")
+    ax.plot(t, seq_good, "-", lw=1.4, color="tab:blue",
+            label=f"{good} (correct), {imu_rate:.0f} Hz")
+    ax.plot(t[::3], window[:, 0, 2], "o", ms=4, color="tab:orange",
+            label="v1: one frame per report")
     ax.set_xlabel("Time (s)")
     ax.set_ylabel("Yaw rate (dps)")
-    ax.set_title("(a) Discarded data: v1 kept 1 sample in 3")
-    ax.legend(fontsize=8)
+    ax.set_title("(a) Frame ordering determines reconstruction")
+    ax.legend(fontsize=7)
     ax.grid(alpha=0.3)
 
     # (b) inter-arrival jitter, host vs device.
@@ -261,23 +347,29 @@ def make_figure(reports, all_frames, result, out_path: Path) -> None:
     ax.legend(fontsize=8, loc="lower right")
     ax.grid(alpha=0.3, axis="x")
 
-    # (d) spectra at both rates.
+    # (d) spectra, both orderings plus the v1 rate.
     ax = axes[1, 1]
     from am.analysis.spectral import welch_psd
 
-    yaw_v2 = all_frames[:, :, 2].reshape(-1)
+    yaw_good = reconstruct(all_frames, good)
+    yaw_bad = reconstruct(all_frames, bad)
     yaw_v1 = all_frames[:, 0, 2]
-    if yaw_v2.size > 256:
-        f2, p2 = welch_psd(yaw_v2, result["imu_rate_hz"])
-        ax.semilogy(f2, p2, lw=1.2, label=f"v2 @ {result['imu_rate_hz']:.0f} Hz")
+    if yaw_bad.size > 256:
+        f, p = welch_psd(yaw_bad, imu_rate)
+        ax.semilogy(f, p, lw=1.0, alpha=0.6, color="tab:red", label=f"{bad} (wrong)")
+    if yaw_good.size > 256:
+        f, p = welch_psd(yaw_good, imu_rate)
+        ax.semilogy(f, p, lw=1.3, color="tab:blue", label=f"{good} (correct)")
     if yaw_v1.size > 128:
-        f1, p1 = welch_psd(yaw_v1, result["host"]["rate_hz"])
-        ax.semilogy(f1, p1, lw=1.2, alpha=0.8,
-                    label=f"v1 @ {result['host']['rate_hz']:.0f} Hz")
+        f, p = welch_psd(yaw_v1, report_rate)
+        ax.semilogy(f, p, lw=1.0, alpha=0.7, color="tab:orange",
+                    label=f"v1 @ {report_rate:.0f} Hz")
+    ax.axvline(report_rate, color="k", ls=":", lw=1.2,
+               label=f"report rate {report_rate:.0f} Hz")
     ax.axvspan(8, 12, alpha=0.25, color="tab:orange")
     ax.set_xlabel("Frequency (Hz)")
     ax.set_ylabel("PSD (dps$^2$/Hz)")
-    ax.set_title("(d) Power spectral density, yaw")
+    ax.set_title("(d) The wrong ordering plants a line at the report rate")
     ax.legend(fontsize=8)
     ax.grid(alpha=0.3)
 
@@ -290,10 +382,24 @@ def make_figure(reports, all_frames, result, out_path: Path) -> None:
 
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("--device", default="right", choices=["left", "right", "pro"])
+    ap.add_argument("--device", default="left", choices=["left", "right", "pro"])
     ap.add_argument("--duration", type=float, default=20.0)
-    ap.add_argument("--out", default="data/acquisition_verification.png")
+    ap.add_argument(
+        "--out",
+        default=None,
+        help="output figure path; defaults to v2/data/ regardless of cwd",
+    )
     args = ap.parse_args()
+
+    # Resolve relative to the project, not the working directory. IDEs commonly
+    # run a script with its own directory as cwd, which previously scattered
+    # output into v2/scripts/data/.
+    project_root = Path(__file__).resolve().parents[1]
+    out_path = (
+        Path(args.out)
+        if args.out
+        else project_root / "data" / "acquisition_verification.png"
+    )
 
     source = JoyConSource(device_type=args.device)
     if not source.open():
@@ -310,19 +416,30 @@ def main() -> int:
         return 1
 
     all_frames = q1_frames_are_distinct(reports)
-    order = q2_frame_order(all_frames)
+    # Timing is measured first: the frame-order test needs the report rate, so
+    # that it knows which frequency the reconstruction artefact would land on.
     result = q3_true_sample_rate(reports)
+    order = q2_frame_order(
+        all_frames, result["imu_rate_hz"], result["device"]["rate_hz"]
+    )
 
-    make_figure(reports, all_frames, result, Path(args.out))
+    make_figure(reports, all_frames, result, order, out_path)
 
     print("=" * 72)
     print("SUMMARY")
     print("=" * 72)
-    print(f"  frame order        : {order}")
-    print(f"  v1 rate            : {result['host']['rate_hz']:.1f} Hz")
-    print(f"  v2 rate            : {result['imu_rate_hz']:.1f} Hz")
-    print(f"  host jitter CV     : {result['host']['cv_percent']:.1f} %")
-    print(f"  packet loss        : {result['loss_percent']:.2f} %")
+    print(f"  frame order            : {order}")
+    print(f"  report rate (device)   : {result['device']['rate_hz']:.1f} Hz")
+    print(f"  IMU rate, v2           : {result['imu_rate_hz']:.1f} Hz")
+    print(f"  IMU rate, v1 ceiling   : {result['host']['rate_hz']:.1f} Hz "
+          f"(one frame per report)")
+    print(f"  host jitter CV         : {result['host']['cv_percent']:.1f} %")
+    print(f"  device jitter CV       : {result['device']['cv_percent']:.1f} %")
+    print(f"  packet loss            : {result['loss_percent']:.2f} %")
+    print()
+    print("  Note: the v1 figure above is the ceiling v1 could have reached by")
+    print("  taking one frame per report. The v1 recording actually achieved")
+    print("  ~33 Hz, because its non-blocking read loop also dropped reports.")
     print()
     print("  Next: scripts/02_record_raw.py to capture the three conditions")
     print("        (stationary / pointing / flick) for spectral analysis.")

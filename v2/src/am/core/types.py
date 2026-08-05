@@ -18,11 +18,17 @@ from typing import Sequence
 
 import numpy as np
 
-# Nominal Joy-Con / Pro Controller IMU timing (standard full input report 0x30).
+# Joy-Con / Pro Controller IMU timing (standard full input report 0x30).
+#
+# These are measured values, not the figures usually quoted. The report period
+# is 15 ms exactly, i.e. 66.7 Hz -- the "60 Hz" often cited in reverse
+# engineering notes is a rounding of it. Measured over a 20 s capture: report
+# dt 14.94 +- 0.52 ms from the device counter, giving 200.7 Hz at the IMU.
 JOYCON_SAMPLE_PERIOD_S = 0.005  # 5 ms between the 3 IMU frames in one report
 JOYCON_FRAMES_PER_REPORT = 3
-JOYCON_REPORT_RATE_HZ = 60.0
-JOYCON_NOMINAL_IMU_RATE_HZ = JOYCON_FRAMES_PER_REPORT * JOYCON_REPORT_RATE_HZ  # 180-200
+JOYCON_REPORT_PERIOD_S = JOYCON_FRAMES_PER_REPORT * JOYCON_SAMPLE_PERIOD_S  # 15 ms
+JOYCON_REPORT_RATE_HZ = 1.0 / JOYCON_REPORT_PERIOD_S  # 66.67 Hz
+JOYCON_NOMINAL_IMU_RATE_HZ = 1.0 / JOYCON_SAMPLE_PERIOD_S  # 200 Hz
 
 
 class Axis(str, Enum):
